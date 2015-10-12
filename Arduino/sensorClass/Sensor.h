@@ -16,8 +16,7 @@ class Sensor
     Sensor(Type whatKind, int pin);
     Sensor(Type whatKind, int pin, int pin2);
     int reed(Type whatKind);
-    float distance();
-    //boolean wall();
+    float floatyRadar();
   private:
     int _pin;
     int _pin2;

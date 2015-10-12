@@ -38,30 +38,8 @@ int Sensor::reed(Type _whatKind) {
       Serial.println("error");
       return 0;
   }
-//  if (whatKind = "distance") {
-//    digitalWrite(_pin, LOW);
-//    delayMicroseconds(2);
-//    digitalWrite(_pin, HIGH);
-//    delayMicroseconds(10);
-//    digitalWrite(_pin, LOW);
-//    return pulseIn(_pin2, HIGH) / 70 / 2;
-//  }
-//  if (whatKind = "wall?") {
-//    int _x = digitalRead(_pin);
-//    return _x;
-//  }
-//  if (whatKind = "generic") {
-//    int _x = digitalRead(_pin);
-//    return _x;
-//  }
-//  else {
-//    int _x = analogRead(_pin);
-//    return _x;
-//  }
 }
-
-
-  float Sensor::distance(){
+  float Sensor::floatyRadar(){
     digitalWrite(_pin, LOW);
       delayMicroseconds(2);
       digitalWrite(_pin, HIGH);
@@ -72,16 +50,4 @@ int Sensor::reed(Type _whatKind) {
       //return derp; //pulseIn(_pin2, HIGH);// / 70 / 2;
       return 0.0069 * pulseIn(_pin2, HIGH) + 0.4921;
   }
-//
-//boolean Sensor::wall(){
-//  int _x = digitalRead(_pin);
-//  return _x;
-//}
 
-//void Sensor::dash()
-//{
-//  digitalWrite(_pin, HIGH);
-//  delay(1000);
-//  digitalWrite(_pin, LOW);
-//  delay(250);
-//}
