@@ -1,2 +1,2 @@
-# 2016-Southeast-Con-Hardware-Competition
+# 2016 SECON Hardware Competition
  A collection of programs and libraries used in competition by the UofL Robotics Team.
