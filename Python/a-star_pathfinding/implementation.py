@@ -4,12 +4,12 @@ from Pathfinding import Node
 from Pathfinding import Util
 
 # Create the map
-map = Map(5, 5)
+map = Map(50, 50)
 map.add_obstacles([(3, 1), (3, 2), (3, 3), (3, 4)])
 
 # Set start and end nodes
 start = map.get_node_by_location((1, 4))
-goal = map.get_node_by_location((4, 4))
+goal = map.get_node_by_location((40, 32))
 
 # Display their id's for debug
 print "Start node id: ", start.get_id()
