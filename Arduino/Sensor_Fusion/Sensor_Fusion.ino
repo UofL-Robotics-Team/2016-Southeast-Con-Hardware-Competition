@@ -45,6 +45,7 @@ THE SOFTWARE.
 // for both classes must be in the include path of your project
 #include "I2Cdev.h"
 #include "digitalWriteFast.h"
+//#include <digitalWriteFast.h>
 #include "MPU6050_6Axis_MotionApps20.h"
 //#include "MPU6050.h" // not necessary if using MotionApps include file
 
@@ -127,8 +128,8 @@ const int ncs = 10;
 extern const unsigned short firmware_length;
 extern const char firmware_data[];
   
-  int xdistance = 0;
-  int ydistance = 0;
+  long xdistance = 0;
+  long ydistance = 0;
   
 
 uint32_t laserPollTimer = 0;
@@ -490,7 +491,10 @@ void loop() {
         laserPollTimer = millis();
         
         xdistance = xdistance + convTwosComp(xydatL[0]) ;//+ convTwosComp(xydatH[0]);
-        ydistance = ydistance + convTwosComp(xydatL[1]) ;//+ convTwosComp(xydatH[1]);
+        ydistance = ydistance + convTwosComp(xydatL[1]);//+ convTwosComp(xydatH[1]);
+
+        //xdistance = xdistance + convTwosComp(xydatL[0])*cos(ypr[0] * 180/M_PI) ;//+ convTwosComp(xydatH[0]);
+        //ydistance = ydistance + convTwosComp(xydatL[1])*sin(ypr[0] * 180/M_PI);//+ convTwosComp(xydatH[1]);
         //Serial.print("X = " + String(xdistance));      
         //Serial.println("|Y = " + String(ydistance)); 
       }
