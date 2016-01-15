@@ -4,6 +4,7 @@
  * Author: Alex Bennett
  * Description: See readme.md
  */
+#include "config.h"
 
 void setup()
 {
