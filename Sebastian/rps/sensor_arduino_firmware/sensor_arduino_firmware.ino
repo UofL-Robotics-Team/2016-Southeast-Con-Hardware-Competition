@@ -28,6 +28,9 @@ uint32_t laserPollTimer = 0;
 uint32_t lastTime = 0;
 const int NCS_PIN = 10;
 
+int xPos;
+int yPos;
+
 
 // --- MPU 6050 ----------------------------------------------------
 MPU6050 mpu;
@@ -328,6 +331,23 @@ void loop()
     blinkState = !blinkState;
     digitalWriteFast(LED_PIN, blinkState);
   }
+
+if(Serial.available()) {
+  //read coordinates
+  int xGoal;
+  int yGoal;
+  int delX = xGoal - xPos;
+  int delY = yGoal - yPos;
+  int distance = sqrt(delX*delX+delY*delY);
+  //get goRate goRate = 
+  int goRate;
+  int fwdBck = goRate * delY / distance;
+  int lftRght = goRate * delX / distance;
+ 
+}
+
+
+  
 }
 
 
