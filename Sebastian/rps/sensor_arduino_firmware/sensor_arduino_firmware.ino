@@ -17,8 +17,8 @@ byte initComplete = 0;
 byte testctr = 0;
 unsigned long currTime;
 unsigned long timer;
-volatile int32_t xydatL[2];
-volatile int32_t xydatH[2];
+volatile int32_t xdata;
+volatile int32_t ydata;
 volatile byte movementflag = 0;
 extern const unsigned short firmware_length;
 extern const char firmware_data[];
@@ -164,22 +164,34 @@ void adns_disp_registers()
   adns_com_begin();
 
   int rctr = 0;
-  Serial.println("--- ADNS 9800 Registers ------------------------------");
+  #ifdef DEBUG_ENABLED
+    Serial.println("--- ADNS 9800 Registers ------------------------------");
+  #endif
   for (rctr = 0; rctr < 4; rctr++) 
   {
     SPI.transfer(oreg[rctr]);
     delay(1);
-    Serial.print(String(oregname[rctr]) + ": ");
-    Serial.print(oreg[rctr], HEX);
-    Serial.print(" (HEX), ");
+    
+    #ifdef DEBUG_ENABLED
+      Serial.print(String(oregname[rctr]) + ": ");
+      Serial.print(oreg[rctr], HEX);
+      Serial.print(" (HEX), ");
+    #endif
+    
     regres = SPI.transfer(0);
-    Serial.print(regres, BIN);
-    Serial.print(" (BIN), ");
-    Serial.print(regres, HEX);
-    Serial.println(" (HEX)");
+    
+    #ifdef DEBUG_ENABLED
+      Serial.print(regres, BIN);
+      Serial.print(" (BIN), ");
+      Serial.print(regres, HEX);
+      Serial.println(" (HEX)");
+    #endif
+    
     delay(1);
   }
-  Serial.println("------------------------------------------------------");
+  #ifdef DEBUG_ENABLED
+    Serial.println("------------------------------------------------------");
+  #endif
   
   adns_com_end();
 }
@@ -231,7 +243,9 @@ void setup()
   mpu.initialize();
   if (!mpu.testConnection())
   {
-    Serial.println("Connection to MPU failed! Program halted.");
+    #ifdef DEBUG_ENABLED
+      Serial.println("Connection to MPU failed! Program halted.");
+    #endif
     return;
   }
 
@@ -263,7 +277,9 @@ void setup()
   else
   {
     // MPU failed to startup
-    Serial.println("MPU failed to startup. Error code: " + String(devStatus)); // 1 = initial memory load failed, 2 = DMP configuration updates failed
+    #ifdef DEBUG_ENABLED
+      Serial.println("MPU failed to startup. Error code: " + String(devStatus)); // 1 = initial memory load failed, 2 = DMP configuration updates failed
+    #endif
   }
 
   // configure LED for output
@@ -278,24 +294,43 @@ void loop()
     if (initComplete == 9 && (millis() - laserPollTimer) > 5 && !digitalRead(3))
     {
       adns_com_begin();
-      xydatL[0] = (int) adns_read_reg(REG_Delta_X_L);
-      xydatH[0] = (int) adns_read_reg(REG_Delta_X_H);
-      xydatL[1] = (int) adns_read_reg(REG_Delta_Y_L);
-      xydatH[1] = (int) adns_read_reg(REG_Delta_X_H);
+      xdata = (int) adns_read_reg(REG_Delta_X_L);
+      //xdata[1] = (int) adns_read_reg(REG_Delta_X_H);
+      ydata = (int) adns_read_reg(REG_Delta_Y_L);
+      //ydata[1] = (int) adns_read_reg(REG_Delta_Y_H);
       adns_com_end();
+      
       laserPollTimer = millis();
 
-      xdistance = xdistance + convert_twos_comp(xydatL[0]);
-      ydistance = ydistance + convert_twos_comp(xydatL[1]);
-
+      xdistance = xdistance + convert_twos_comp(xdata);
+      ydistance = ydistance + convert_twos_comp(ydata);
     }
 
-    // Print the data periodically
-    if ((millis() - lastTime) > 100)
+    char command = 0;
+    
+    if(Serial.available())
     {
-      Serial.print("X = " + String(xdistance));
-      Serial.print(" | Y = " + String(ydistance));
-      Serial.println(" | R = " + String(ypr[0] * 180 / M_PI));
+      command = Serial.read();
+    }
+
+    // Reset the distance totals
+    if(command == 'z')
+    {
+      xdistance = 0;
+      ydistance = 0;
+    }
+    
+    // Print the data when requested and time constraint has been passed
+    if((millis() - lastTime) > 100 && command == 'p')
+    {
+      #ifdef DEBUG_ENABLED
+        Serial.print("X = " + String(xdistance));
+        Serial.print(" | Y = " + String(ydistance));
+        Serial.println(" | R = " + String(ypr[0] * 180 / M_PI));
+      #else
+        Serial.println(String(((double) xdistance / 1600)) + "," + String(((double) ydistance / 1600)) + "," + String(ypr[0] * 180 / M_PI));
+      #endif
+      
       lastTime = millis();
     }
   }
@@ -308,7 +343,9 @@ void loop()
   if ((mpuIntStatus & 0x10) || fifoCount == 1024) // Check for FIFO overflow (hopefully doesn't happen)
   {                             
     mpu.resetFIFO();
-    Serial.println("FIFO overflow!");
+    #ifdef DEBUG_ENABLED
+      Serial.println("FIFO overflow!");
+    #endif
   }
   else if (mpuIntStatus & 0x02) // Otherwise check for DMP data
   {
