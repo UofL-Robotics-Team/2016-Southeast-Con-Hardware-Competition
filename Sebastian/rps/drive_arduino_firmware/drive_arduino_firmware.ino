@@ -1,151 +1,228 @@
 /**
  * Drive firmware for Sebastian. 
- * 
- * Values for microstepping:
- * --------------------------
- * | Frequency  | Microstep |
- * |------------------------| 
- * |    >=700   |    16     |
- * |    ?       |     8     |
- * |    >=150   |     4     |
- * |    2       |     -     |
- * |    ?       |     1     |
- * --------------------------
- * 
+ *
  * Author: William Funke
- * Date: 9/28/2015
+ * Subauthor: Alex Bennett
  */
 
-#define frontLeftP        2
-#define frontRightP       4
-#define backLeftP         6
-#define backRightP        8
-#define frontLeftDirP     3
-#define frontRightDirP    5
-#define backLeftDirP      7
-#define backRightDirP     9
+#include "Drivetrain.h"
 
-#define MS1               31  // Blue wire
-#define MS2               33  // Green wire
-#define MS3               35  // Orange wire
+#define DEBUG_ENABLED // Debug flag (COMMENT THIS OUT UNLESS A HUMAN IS OPERATING THE CONTROLS)
 
-#define DEFAULTMICROSTEP  2
-#define DEFAULTFREQ       0
-#define MAXFREQ           500
+#define frontLeftP        9
+#define frontRightP       7
+#define backLeftP         5
+#define backRightP        3
 
-int targetForward;
-int targetRight;
-int targetClockwise;
+#define frontLeftDirP     8
+#define frontRightDirP    6
+#define backLeftDirP      4
+#define backRightDirP     2
 
-int forward;
-int right;
-int clockwise;
+#define ENABLE            52
+#define MS1               50
+#define MS2               48 
+#define MS3               46
 
-int microMultiplier;
+// Transmitter channels
+#define CH1               10
+#define CH2               11
+#define CH3               12
 
-void setInterrupt1(int);
-void setInterrupt2(int);
-void setInterrupt3(int);
-void setInterrupt4(int);
-int correctMicrostep(int);
-void selectMicrostep(int);
-int ramp(int, int);
+// Transmitter data
+int ch1 = 0, ch2 = 0, ch3 = 0;
 
-char readState = '0';
+// Limit switch pins
+#define LIMIT_SWT_NORTH   47
+#define LIMIT_SWT_SOUTH   49
+#define LIMIT_SWT_EAST    51
+#define LIMIT_SWT_WEST    53
 
-void setup()
-{
-	pinMode(frontLeftP, OUTPUT);
-  pinMode(frontRightP, OUTPUT);
-  pinMode(backLeftP, OUTPUT);
-  pinMode(backRightP, OUTPUT);
+// Create drivetrain
+Drivetrain drive(MS1, MS2, MS3);
 
-  pinMode(frontLeftDirP, OUTPUT);
-  pinMode(frontRightDirP, OUTPUT);
-  pinMode(backLeftDirP, OUTPUT);
-  pinMode(backRightDirP, OUTPUT);
+// Define drivetrain reference variables
+int forward_speed;
+int right_speed;
+int clockwise_speed;
 
-  pinMode(MS1,OUTPUT);
-  pinMode(MS2,OUTPUT);
-  pinMode(MS3,OUTPUT);
+double target_x;
+double current_x;
 
-  Serial.begin(9600);
-  delay(1000);
-
-  Serial.println("Enter f<number> to set forward velocity");
-  Serial.println("Enter r<number> to set right velocity");
-  Serial.println("Enter c<number> to set clockwise velocity");
-  Serial.println("Enter m<number> to set microstep amount");
-  Serial.println("Any number of these commands may be grouped together in a line;");
-  Serial.println("order does not matter.");
-
-  noInterrupts();
-  TCCR1A = 0;
-  TCCR1B = 0;
-  TCCR1B |= (1 << WGM12);
-  TCCR1B |= (1 << CS12 | 1 << CS10);
-
-  TCCR3A = 0;
-  TCCR3B = 0;
-  TCCR3B |= (1 << WGM32);  
-  TCCR3B |= (1 << CS32 | 1 << CS30); 
-
-  TCCR4A = 0;
-  TCCR4B = 0;
-  TCCR4B |= (1 << WGM42);
-  TCCR4B |= (1 << CS42 | 1 << CS40); 
-
-  TCCR5A = 0;
-  TCCR5B = 0;
-  TCCR5B |= (1 << WGM52);
-  TCCR5B |= (1 << CS52 | 1 << CS50);
-
-  selectMicrostep(correctMicrostep(DEFAULTFREQ));
-
-  setInterrupt1(DEFAULTFREQ);
-  setInterrupt2(DEFAULTFREQ);
-  setInterrupt3(DEFAULTFREQ);
-  setInterrupt4(DEFAULTFREQ);
-  interrupts();
-
-  targetForward = DEFAULTFREQ;
-  targetRight = 0;
-  targetClockwise = 0;
-
-  forward = 0;
-  right = 0;
-  clockwise = 0;
-}
+int set_angle;
+int current_angle;
 
 ISR(TIMER1_COMPA_vect)
 {
-  digitalWrite(frontLeftP, HIGH);
-  digitalWrite(frontLeftP, LOW);
+  drive.step(FRLEFT);
 }
 
 ISR(TIMER3_COMPA_vect)
 {
-  digitalWrite(frontRightP, HIGH);
-  digitalWrite(frontRightP, LOW);
+  drive.step(FRRIGHT);
 }
 
 ISR(TIMER4_COMPA_vect)
 {
-  digitalWrite(backLeftP, HIGH);
-  digitalWrite(backLeftP, LOW);
+  drive.step(BKLEFT);
 }
 
 ISR(TIMER5_COMPA_vect)
 {
-  digitalWrite(backRightP, HIGH);
-  digitalWrite(backRightP, LOW);
+  drive.step(BKRIGHT);
+}
+
+void setup()
+{
+  // Temporarily disable interrupts
+  noInterrupts();
+
+  // Setup limit switches
+  pinMode(LIMIT_SWT_NORTH, INPUT);
+  pinMode(LIMIT_SWT_SOUTH, INPUT);
+  pinMode(LIMIT_SWT_EAST, INPUT);
+  pinMode(LIMIT_SWT_WEST, INPUT);
+
+  // Transmitter inputs
+  pinMode(CH1, INPUT);
+  pinMode(CH2, INPUT);
+  pinMode(CH3, INPUT);
+
+  // Start serial and print directions
+  Serial.begin(9600);
+  delay(1000);
+
+  // Print debug information
+  printDebug("Enter f<number> to set forward velocity");
+  printDebug("Enter r<number> to set right velocity");
+  printDebug("Enter c<number> to set clockwise velocity");
+  printDebug("Enter z<number 1-4> to zero in the specified direction");
+  printDebug("Any number of these commands may be grouped together in a line; order does not matter.");
+
+  drive.attachStepper(FRLEFT, frontLeftP, frontLeftDirP, -1);
+  drive.attachStepper(FRRIGHT, frontRightP, frontRightDirP, 1);
+  drive.attachStepper(BKLEFT, backLeftP, backLeftDirP, -1);
+  drive.attachStepper(BKRIGHT, backRightP, backRightDirP, 1);
+
+  // Re-enable interrupts
+  interrupts();
+
+  // Enable stepper drivers
+  pinMode(ENABLE, OUTPUT);
+  digitalWrite(ENABLE, LOW);
 }
 
 void loop()
 {
+  // Grab serial input
+  readSerial();
+  //readReceiver();
 
-  int counter = 0;
-  if(Serial.available() > 0)
+  // Update drivetrain
+  drive.setForward(forward_speed);
+  drive.setRight(right_speed);
+  drive.setClockwise(clockwise_speed);
+  drive.updateSpeeds();
+}
+
+void zeroDirection(int direction) // 1 = NORTH, 2 = SOUTH, 3 = EAST, 4 = WEST
+{
+  switch(direction)
+  {
+    // Zero north
+    case 1: 
+      // Drive until switch is hit
+      while(!digitalRead(LIMIT_SWT_NORTH))
+      {
+         // Set target velocities
+        drive.setForward(100);
+        drive.setRight(0);
+        drive.setClockwise(0);
+        drive.updateSpeeds();
+      }
+
+      // Switch was hit, set speed to 0
+      drive.setForward(0);
+      drive.setRight(0);
+      drive.setClockwise(0);
+      drive.updateSpeeds();
+
+      // Break case
+      break;
+
+    // Zero south
+    case 2:
+      // Drive until switch is hit
+      while(!digitalRead(LIMIT_SWT_SOUTH))
+      {
+         // Set target velocities
+        drive.setForward(-100);
+        drive.setRight(0);
+        drive.setClockwise(0);
+        drive.updateSpeeds();
+      }
+
+      // Switch was hit, set speed to 0
+      drive.setForward(0);
+      drive.setRight(0);
+      drive.setClockwise(0);
+      drive.updateSpeeds();
+
+      // Break case
+      break;
+
+    // Zero east
+    case 3:
+      // Drive until switch is hit
+      while(!digitalRead(LIMIT_SWT_EAST))
+      {
+         // Set target velocities
+        drive.setForward(0);
+        drive.setRight(100);
+        drive.setClockwise(0);
+        drive.updateSpeeds();
+      }
+
+      // Switch was hit, set speed to 0
+      drive.setForward(0);
+      drive.setRight(0);
+      drive.setClockwise(0);
+      drive.updateSpeeds();
+
+      // Break case
+      break;
+
+    // Zero west
+    case 4:
+      // Drive until switch is hit
+      while(!digitalRead(LIMIT_SWT_WEST))
+      {
+         // Set target velocities
+        drive.setForward(0);
+        drive.setRight(-100);
+        drive.setClockwise(0);
+        drive.updateSpeeds();
+      }
+
+      // Switch was hit, set speed to 0
+      drive.setForward(0);
+      drive.setRight(0);
+      drive.setClockwise(0);
+      drive.updateSpeeds();
+
+      // Break case
+      break;
+
+    default:
+      break;
+  }
+}
+
+void readSerial()
+{
+  char readState;
+
+  if(Serial.available() > 0) 
   {
     do
     {
@@ -154,19 +231,19 @@ void loop()
       switch(readState)
       {
         case 'f':
-          targetForward = Serial.parseInt();
+          forward_speed = Serial.parseInt();
           readState = 'o';
           break;
         case 'r':
-          targetRight = Serial.parseInt();
+          right_speed = Serial.parseInt();
           readState = 'o';
           break;
         case 'c':
-          targetClockwise = Serial.parseInt();
+          clockwise_speed = Serial.parseInt();
           readState = 'o';
           break;
-        case 'm':
-          selectMicrostep(Serial.parseInt());
+        case 'z':
+          zeroDirection(Serial.parseInt());
           readState = 'o';
           break;
         default:
@@ -175,141 +252,32 @@ void loop()
     }
     while(readState != 'i');
   }
-
-  if(forward != targetForward || right != targetRight || clockwise != targetClockwise)
-  {
-    forward += ramp(forward,targetForward);
-    right += ramp(right, targetRight);
-    clockwise += ramp(clockwise,targetClockwise);
-    
-    int frontLeft = forward + clockwise + right;
-    int frontRight = forward - clockwise - right;
-    int backLeft = forward + clockwise - right;
-    int backRight = forward - clockwise + right;
-
-    int max = abs(frontLeft);
-    if (abs(frontRight) > max) max = abs(frontRight);
-    if (abs(backLeft) > max) max = abs(backLeft);
-    if (abs(backRight) > max) max = abs(backRight);
-
-    if(max > MAXFREQ)
-    {
-      frontLeft=frontLeft/max*MAXFREQ; 
-      frontRight=frontRight/max*MAXFREQ; 
-      backLeft=backLeft/max*MAXFREQ; 
-      backRight=backRight/max*MAXFREQ;
-    }
-
-    selectMicrostep(correctMicrostep(max));
-
-    setInterrupt1(frontLeft);
-    setInterrupt2(frontRight);
-    setInterrupt3(backLeft);
-    setInterrupt4(backRight);
-    delay(5);
-  }
 }
 
-
-int ramp(int from, int target)
+void readReceiver()
 {
-  int rampFactor = 5;
-  int difference = abs(from - target);
-  if(difference < rampFactor) rampFactor = difference;
-  if(from > target) return -rampFactor;
-  else if(from < target) return rampFactor;
-  return 0;
+  // read the input channels
+  noInterrupts();
+  ch1 = pulseIn(CH1, HIGH);
+  ch2 = pulseIn(CH2, HIGH);
+  ch3 = pulseIn(CH3, HIGH);
+  interrupts();
+
+
+  if (abs((ch1 - 1500)) < 50) ch1 = 1500;
+  if (abs((ch2 - 1500)) < 50) ch2 = 1500;
+  if (abs((ch3 - 1500)) < 50) ch3 = 1500;
+
+  forward_speed = ch1-1500;
+  right_speed = ch2-1500;
+  clockwise_speed = ch3-1500;
+
+  Serial.println("F: " + String(forward_speed) + ", R: " + String(right_speed) + ", CW: " + String(clockwise_speed));
 }
 
-void setInterrupt1(int frequency){
-  TCNT1 = 0;
-
-  OCR1A = 15625/abs(frequency*microMultiplier)-1;//// = (clockFreq) / (desiredFreq*preScalar) - 1 (must be <65536)
-  TIMSK1 |= (1 << OCIE1A);
-
-  Serial.println(frequency);
-  if(frequency == 0) TIMSK1 &= ~(1 << OCIE1A);
-  else if(frequency > 0) digitalWrite(frontLeftDirP, HIGH);
-  else if(frequency < 0) digitalWrite(frontLeftDirP, LOW);
-}
-
-void setInterrupt2(int frequency)
+void printDebug(String msg)
 {
-  TCNT3 = 0;
-
-  OCR3A = 15625/abs(frequency*microMultiplier)-1;
-  TIMSK3 |= (1 << OCIE3A);
-
-  if(frequency == 0) TIMSK3 &= ~(1 << OCIE3A);
-  else if(frequency > 0) digitalWrite(frontRightDirP, LOW);
-  else if(frequency < 0) digitalWrite(frontRightDirP, HIGH);
-}
-
-void setInterrupt3(int frequency)
-{
-  TCNT4 = 0;
-
-  OCR4A = 15625/abs(frequency*microMultiplier)-1;
-  TIMSK4 |= (1 << OCIE4A);
-
-  if(frequency == 0) TIMSK4 &= ~(1 << OCIE4A);
-  else if(frequency > 0) digitalWrite(backLeftDirP, HIGH);
-  else if(frequency < 0) digitalWrite(backLeftDirP, LOW);
-}
-
-void setInterrupt4(int frequency){
-  TCNT5 = 0;
-
-  OCR5A = 15625 / abs(frequency * microMultiplier) - 1;
-  TIMSK5 |= (1 << OCIE5A); 
-
-  if(frequency == 0) TIMSK5 &= ~(1 << OCIE5A);
-  else if(frequency > 0) digitalWrite(backRightDirP, LOW);
-  else if(frequency < 0) digitalWrite(backRightDirP, HIGH);
-}
-
-int correctMicrostep(int velo) 
-{
-  if(velo <= 150) return 16;
-  else if(velo <= 350) return 8;
-  else if(velo <= 500) return 4;
-  else if(velo <=650) return 2;
-  else return 1;
-}
-
-void selectMicrostep(int amount)
-{
-  switch(amount)
-  {
-    case 1:
-      digitalWrite(MS1,0);
-      digitalWrite(MS2,0);
-      digitalWrite(MS3,0);
-      microMultiplier = amount;
-      break;
-    case 2:
-      digitalWrite(MS1,1);
-      digitalWrite(MS2,0);
-      digitalWrite(MS3,0);
-      microMultiplier = amount;
-      break;
-    case 4:
-      digitalWrite(MS1,0);
-      digitalWrite(MS2,1);
-      digitalWrite(MS3,0);
-      microMultiplier = amount;
-      break;
-    case 8:
-      digitalWrite(MS1,1);
-      digitalWrite(MS2,1);
-      digitalWrite(MS3,0);
-      microMultiplier = amount;
-      break;
-    case 16:
-      digitalWrite(MS1,1);
-      digitalWrite(MS2,1);
-      digitalWrite(MS3,1);
-      microMultiplier = amount;
-      break;
-  }
+  #ifdef DEBUG_ENABLED
+    Serial.println(msg);
+  #endif
 }
