@@ -89,7 +89,7 @@ void setup()
   pinMode(CH3, INPUT);
 
   // Start serial and print directions
-  Serial.begin(9600);
+  Serial.begin(115200);
   delay(1000);
 
   // Print debug information
