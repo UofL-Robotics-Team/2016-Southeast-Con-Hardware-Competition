@@ -251,6 +251,8 @@ void readSerial()
       }
     }
     while(readState != 'i');
+
+    Serial.flush();
   }
 }
 
@@ -262,7 +264,6 @@ void readReceiver()
   ch2 = pulseIn(CH2, HIGH);
   ch3 = pulseIn(CH3, HIGH);
   interrupts();
-
 
   if (abs((ch1 - 1500)) < 50) ch1 = 1500;
   if (abs((ch2 - 1500)) < 50) ch2 = 1500;

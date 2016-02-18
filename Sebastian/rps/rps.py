@@ -28,8 +28,8 @@ class RPS:
     def connect(self):
         try:
             # Connect to serial
-            self._drive_serial = serial.Serial(self._drive_com_port, baudrate=self._drive_baud_rate, timeout=5)
-            self._sensor_serial = serial.Serial(self._sensor_com_port, baudrate=self._sensor_baud_rate, timeout=5)
+            self._drive_serial = serial.Serial(self._drive_com_port, baudrate=self._drive_baud_rate, timeout=5, write_timeout=5)
+            self._sensor_serial = serial.Serial(self._sensor_com_port, baudrate=self._sensor_baud_rate, timeout=5, write_timeout=5)
 
             # Sleep while connection completes
             time.sleep(1)
@@ -63,13 +63,14 @@ class RPS:
             return
         try:
             # Flush serial
-            self._sensor_serial.flush()
-
-            # Grab the current position
-            self._sensor_serial.write('p\n')
+            self._sensor_serial.flushInput()
+            self._sensor_serial.flushOutput()
 
             # Sleep for data to transfer
             time.sleep(0.1)
+
+            # Grab the current position
+            self._sensor_serial.write('p\n')
 
             # Parse position data
             y, x, r = self._sensor_serial.readline().replace('\r\n', '').split(',')
@@ -86,13 +87,14 @@ class RPS:
             return
         try:
             # Flush serial
-            self._sensor_serial.flush()
+            self._sensor_serial.flushInput()
+            self._sensor_serial.flushOutput()
+
+            # Sleep for data to transfer
+            time.sleep(0.1)
 
             # Grab the current position
             self._sensor_serial.write('z\n')
-
-            # Sleep to allow transfer to complete
-            time.sleep(0.1)
         except serial.SerialException:
             messageutils.print_error('Serial exception thrown')
 
@@ -103,7 +105,11 @@ class RPS:
             return
         try:
             # Flush serial
-            self._sensor_serial.flush()
+            self._sensor_serial.flushInput()
+            self._sensor_serial.flushOutput()
+
+            # Sleep for data to transfer
+            time.sleep(0.1)
 
             # Set velocities
             self._drive_serial.write('f%d r%d\n' % (x_rate, y_rate))
@@ -120,20 +126,18 @@ class RPS:
             return
         try:
             # Flush serial
-            self._sensor_serial.flush()
+            self._sensor_serial.flushInput()
+            self._sensor_serial.flushOutput()
+
+            # Sleep for data to transfer
+            time.sleep(0.1)
 
             # Set rotation rate
             self._drive_serial.write('c%d\n' % rotation_rate)
-
-            # Sleep to allow transfer to complete
-            time.sleep(0.1)
         except serial.SerialException:
             messageutils.print_error('Serial exception thrown')
 
     def travel(self, rate, x_dist, y_dist):
-        # Connect serial
-        self.connect()
-
         # Check RPS status before continuing
         if not self._ready:
             messageutils.print_error('Serial not connected')
@@ -141,6 +145,12 @@ class RPS:
 
         # Status update
         messageutils.print_info('Traveling %d forward/back and %d right/left' % (x_dist, y_dist))
+
+        # Calculate slow rate ahead of time
+        if rate >= 100:
+            slow_rate = 100
+        else:
+            slow_rate = rate
 
         # Zero position
         self.zero_position()
@@ -158,49 +168,52 @@ class RPS:
                 while x < x_dist - 3:
                     x, y, r = self.get_position()
                     messageutils.print_info('X: ' + str(x) + ', Y: ' + str(y) + ', R: ' + str(r))
-                    time.sleep(0.1)
 
                 # Status update
                 messageutils.print_info('Approaching target')
 
                 # Slow down for accuracy
-                self.set_velocity(100, 0)
+                self.set_velocity(slow_rate, 0)
 
                 # Travel until distance has been reached
                 while x < x_dist:
                     x, y, r = self.get_position()
                     messageutils.print_info('X: ' + str(x) + ', Y: ' + str(y) + ', R: ' + str(r))
-                    time.sleep(0.1)
 
                 # Status update
                 messageutils.print_info('Target met')
             elif x_dist < 0:
                 # Set the X velocity
-                self.set_velocity(0 - rate, 0)
+                self.set_velocity(-rate, 0)
 
                 # Travel until distance has been reached
                 while x > x_dist + 3:
                     x, y, r = self.get_position()
                     messageutils.print_info('X: ' + str(x) + ', Y: ' + str(y) + ', R: ' + str(r))
-                    time.sleep(0.1)
 
                 # Status update
                 messageutils.print_info('Approaching target')
 
                 # Slow down for accuracy
-                self.set_velocity(-100, 0)
+                self.set_velocity(-slow_rate, 0)
 
                 # Travel until distance has been reached
                 while x > x_dist:
                     x, y, r = self.get_position()
                     messageutils.print_info('X: ' + str(x) + ', Y: ' + str(y) + ', R: ' + str(r))
-                    time.sleep(0.1)
 
                 # Status update
                 messageutils.print_info('Target met')
 
             # Distance met, stop moving
             self.set_velocity(0, 0)
+
+        # Zero position
+        self.zero_position()
+
+        # Get current position
+        x, y, r = self.get_position()
+
         # Handle Y positioning
         if y_dist != 0:
             if y_dist > 0:
@@ -211,45 +224,71 @@ class RPS:
                 while y < y_dist - 3:
                     x, y, r = self.get_position()
                     messageutils.print_info('X: ' + str(x) + ', Y: ' + str(y) + ', R: ' + str(r))
-                    time.sleep(0.1)
 
                 # Status update
                 messageutils.print_info('Approaching target')
 
                 # Slow down for accuracy
-                self.set_velocity(0, 100)
+                self.set_velocity(0, slow_rate)
 
                 # Travel until distance has been reached
                 while y < y_dist:
                     x, y, r = self.get_position()
                     messageutils.print_info('X: ' + str(x) + ', Y: ' + str(y) + ', R: ' + str(r))
-                    time.sleep(0.1)
 
                 # Status update
                 messageutils.print_info('Target met')
             elif y_dist < 0:
                 # Set the X velocity
-                self.set_velocity(0, 0 - rate)
+                self.set_velocity(0, -rate)
 
                 # Travel until distance has been reached
                 while y > y_dist + 3:
                     x, y, r = self.get_position()
                     messageutils.print_info('X: ' + str(x) + ', Y: ' + str(y) + ', R: ' + str(r))
-                    time.sleep(0.1)
 
                 # Status update
                 messageutils.print_info('Approaching target')
 
                 # Slow down for accuracy
-                self.set_velocity(0, -100)
+                self.set_velocity(0, -slow_rate)
 
                 # Travel until distance has been reached
                 while y > y_dist:
                     x, y, r = self.get_position()
                     messageutils.print_info('X: ' + str(x) + ', Y: ' + str(y) + ', R: ' + str(r))
-                    time.sleep(0.1)
 
                 # Status update
                 messageutils.print_info('Target met')
             # Distance met, stop moving
             self.set_velocity(0, 0)
+
+    def rotate(self, rate, degrees):
+        # Check RPS status before continuing
+        if not self._ready:
+            messageutils.print_error('Serial not connected')
+            return
+
+        # Get initial angle
+        x, y, r = self.get_position()
+
+        initial_r = r
+
+        if degrees > 0:
+            self.set_rotation_rate(rate)
+
+            while r < initial_r + degrees:
+                x, y, r = self.get_position()
+                messageutils.print_info('X: ' + str(x) + ', Y: ' + str(y) + ', R: ' + str(r))
+
+            self.set_rotation_rate(0)
+        elif degrees < 0:
+            self.set_rotation_rate(-rate)
+
+            while r > initial_r + degrees:
+                x, y, r = self.get_position()
+                messageutils.print_info('X: ' + str(x) + ', Y: ' + str(y) + ', R: ' + str(r))
+
+            self.set_rotation_rate(0)
+
+        messageutils.print_info("Turn complete")

@@ -251,10 +251,10 @@ void setup()
   devStatus = mpu.dmpInitialize();
 
   // Set GYRO offsets
-  mpu.setXGyroOffset(220);
-  mpu.setYGyroOffset(76);
-  mpu.setZGyroOffset(-85);
-  mpu.setZAccelOffset(1788); // 1688 factory default for my test chip
+  mpu.setXGyroOffset(0);
+  mpu.setYGyroOffset(0);
+  mpu.setZGyroOffset(41);
+  mpu.setZAccelOffset(1788);
 
   // Check MPU status to ensure successful startup
   if(devStatus == 0)
@@ -314,14 +314,20 @@ void loop()
           // Reset the distance totals
           xdistance = 0;
           ydistance = 0;
+          break;
         case 'p':
           // Return position information
           if((millis() - lastTime) > 100)
           {
-            Serial.println(String(((double) xdistance / 1600)) + "," + String(((double) ydistance / 1600)) + "," + String(ypr[0] * 180 / M_PI));
+            Serial.println(String((double) 0.00 - (double) xdistance / 1600) + "," + String((double) ydistance / 1600) + "," + String(ypr[0] * 180 / M_PI));
             lastTime = millis();
           }
+          break;
+        default:
+          break;
       }
+
+      Serial.flush();
     }
   }
 

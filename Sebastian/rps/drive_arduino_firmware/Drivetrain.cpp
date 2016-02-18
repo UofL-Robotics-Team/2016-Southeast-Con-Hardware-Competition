@@ -8,13 +8,13 @@
 #include "Drivetrain.h"
 #include "Arduino.h"
 
-#define DEFAULTMAX 500
+#define DEFAULTMAX 400
 #define DEFAULTRAMP 10
 
-#define X16THRESH 500
-#define X8THRESH 550
-#define X4THRESH 600
-#define X2THRESH 650
+#define X16THRESH 200
+#define X8THRESH 250
+#define X4THRESH 300
+#define X2THRESH 350
 
 Drivetrain::Drivetrain(int MS1, int MS2, int MS3)
 {
