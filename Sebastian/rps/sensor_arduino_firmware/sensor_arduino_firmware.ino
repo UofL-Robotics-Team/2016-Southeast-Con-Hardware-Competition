@@ -19,11 +19,14 @@ unsigned long currTime;
 unsigned long timer;
 volatile int32_t xdata;
 volatile int32_t ydata;
+//volatile byte xydata[4];
+//int16_t* x = (int16_t*) &xydata[0];
+//int16_t* y = (int16_t*) &xydata[2];
 volatile byte movementflag = 0;
 extern const unsigned short firmware_length;
 extern const char firmware_data[];
-long xdistance = 0;
-long ydistance = 0;
+int64_t xdistance = 0;
+int64_t ydistance = 0;
 uint32_t laserPollTimer = 0;
 uint32_t lastTime = 0;
 const int NCS_PIN = 10;
@@ -142,6 +145,8 @@ void adns_start()
   // upload the firmware
   adns_upload_firmware();
   delay(10);
+  adns_write_reg(REG_Configuration_I, 0x01); // 50 cpi
+  delay(10);
   //enable laser(bit 0 = 0b), in normal mode (bits 3,2,1 = 000b)
   // reading the actual value of the register is important because the real
   // default value is different from what is said in the datasheet, and if you
@@ -227,7 +232,6 @@ void setup()
   adns_disp_registers();
   delay(100);
   initComplete = 9;
-  adns_read_reg(REG_Delta_X_L);
 
   // --- MPU 6050 --------------------------------------------------
 
@@ -263,7 +267,7 @@ void setup()
     mpu.setDMPEnabled(true);
 
     // Enable interrupt
-    attachInterrupt(0, dmpDataReady, RISING); // This is pin 2
+    attachInterrupt(digitalPinToInterrupt(3), dmpDataReady, RISING); // This is pin 2
     mpuIntStatus = mpu.getIntStatus();
 
     // Set DMP ready flag so loop can safely begin
@@ -288,16 +292,39 @@ void loop()
   {
     // Grab ADNS data periodically, when available
     if (initComplete == 9 && (millis() - laserPollTimer) > 5 && !digitalRead(3))
-    {
-      adns_com_begin();
-      xdata = (int) adns_read_reg(REG_Delta_X_L);
-      //xdata[1] = (int) adns_read_reg(REG_Delta_X_H);
-      ydata = (int) adns_read_reg(REG_Delta_Y_L);
-      //ydata[1] = (int) adns_read_reg(REG_Delta_Y_H);
-      adns_com_end();
-      
+    {      
+      /*
+      // Read motion data
+      xydata[0] = (byte) adns_read_reg(REG_Delta_X_L);
+      xydata[1] = (byte) adns_read_reg(REG_Delta_X_H);
+      xydata[2] = (byte) adns_read_reg(REG_Delta_Y_L);
+      xydata[3] = (byte) adns_read_reg(REG_Delta_Y_H);
+
+      // Save last poll time
       laserPollTimer = millis();
 
+      // Update distances
+      xdistance += float(*x) / 200 * 2.54;
+      ydistance += float(*y) / 200 * 2.54;
+      */
+      
+      // Lock motion registers
+      uint8_t mot_reg = (uint8_t) adns_read_reg(REG_Motion);
+
+      // Read motion data
+      xdata = (int32_t) adns_read_reg(REG_Delta_X_L);
+      adns_read_reg(REG_Delta_X_H); // discard upper register
+      ydata = (int32_t) adns_read_reg(REG_Delta_Y_L);
+      adns_read_reg(REG_Delta_Y_H); // discard upper register
+
+      // Concatenate upper and lower data registers
+      //int32_t full_xdata = (xdata[1] << 16) | xdata[0];
+      //int32_t full_ydata = (ydata[1] << 16) | ydata[0];
+
+      // Record last poll time
+      laserPollTimer = millis();
+
+      // Add to total distance
       xdistance = xdistance + convert_twos_comp(xdata);
       ydistance = ydistance + convert_twos_comp(ydata);
     }
@@ -319,7 +346,8 @@ void loop()
           // Return position information
           if((millis() - lastTime) > 100)
           {
-            Serial.println(String((double) 0.00 - (double) xdistance / 1600) + "," + String((double) ydistance / 1600) + "," + String(ypr[0] * 180 / M_PI));
+            Serial.println(String((double) 0.00 - (double) ydistance / 50) + "," + String((double) 0.00 - (double) xdistance / 50) + "," + String(ypr[0] * 180 / M_PI));
+            //Serial.println(String(ydistance) + "," + String(xdistance) + "," + String(ypr[0] * 180 / M_PI));
             lastTime = millis();
           }
           break;
@@ -357,8 +385,8 @@ void loop()
     mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
 
     // Blink LED to indicate activity
-    blinkState = !blinkState;
-    digitalWriteFast(LED_PIN, blinkState);
+    //blinkState = !blinkState;
+    //digitalWriteFast(LED_PIN, blinkState);
   }
 }
 

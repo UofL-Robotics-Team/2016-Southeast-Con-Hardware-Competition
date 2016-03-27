@@ -8,13 +8,13 @@
 #include "Drivetrain.h"
 #include "Arduino.h"
 
-#define DEFAULTMAX 400
-#define DEFAULTRAMP 10
+#define DEFAULTMAX 900
+#define DEFAULTRAMP 50
 
-#define X16THRESH 200
-#define X8THRESH 250
-#define X4THRESH 300
-#define X2THRESH 350
+#define X16THRESH 400
+#define X8THRESH 600
+#define X4THRESH 800
+#define X2THRESH 900
 
 Drivetrain::Drivetrain(int MS1, int MS2, int MS3)
 {
@@ -132,13 +132,13 @@ void Drivetrain::updateSpeeds()
 		right.current += ramp(right);
 		clockwise.current += ramp(clockwise);
 
-		//Calculate Individual Motor Kinematics
+		// Calculate individual motor kinematics
 		fr_left.frequency = forward.current + clockwise.current + right.current;
 		fr_right.frequency = forward.current - clockwise.current - right.current;
 		bk_left.frequency = forward.current + clockwise.current - right.current;
 		bk_right.frequency = forward.current - clockwise.current + right.current;
 
-		//Scale speeds to safe levels
+		// Scale speeds to safe levels
 		int max = abs(fr_left.frequency);
 		if(abs(fr_right.frequency) > max) max = abs(fr_right.frequency);
 		if(abs(bk_left.frequency) > max) max = abs(bk_left.frequency);
@@ -153,15 +153,15 @@ void Drivetrain::updateSpeeds()
 		}
 
 		selectMicrostep(max);
-
+   
 		setTimer1(fr_left.frequency);
-        setDir(fr_left);
+    setDir(fr_left);
 		setTimer3(fr_right.frequency);
-        setDir(fr_right);
+    setDir(fr_right);
 		setTimer4(bk_left.frequency);
-        setDir(bk_left);
+    setDir(bk_left);
 		setTimer5(bk_right.frequency);
-        setDir(bk_right);
+    setDir(bk_right);
 	}
 	return;
 }
@@ -225,9 +225,22 @@ int Drivetrain::ramp(Speed speed)
 {
 	int scaledRamp = ramp_factor;
 	int difference = abs(speed.current - speed.target);
-	if(difference < ramp_factor) scaledRamp = difference;
-	if(speed.current > speed.target) return -scaledRamp;
-	else if(speed.current < speed.target) return scaledRamp;
+
+  delay(5);
+ 
+	if(difference < ramp_factor) 
+	{
+	  scaledRamp = difference;
+	}
+	if(speed.current > speed.target)
+	{
+	  return -scaledRamp;
+	}
+	else if(speed.current < speed.target) 
+	{
+	  return scaledRamp;
+	}
+ 
 	return 0;
 }
 

@@ -35,7 +35,7 @@ class Drivetrain
 {
 	public:
 		Drivetrain(int, int, int);
-		
+    
 		void setForward(int forward);
 		void setRight(int right);
 		void setClockwise(int clockwise);

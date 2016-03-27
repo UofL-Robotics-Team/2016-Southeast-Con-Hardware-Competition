@@ -73,10 +73,46 @@ class RPS:
             self._sensor_serial.write('p\n')
 
             # Parse position data
-            y, x, r = self._sensor_serial.readline().replace('\r\n', '').split(',')
+            x, y, r = self._sensor_serial.readline().replace('\r\n', '').split(',')
 
             # Return position information
             return float(x), float(y), float(r)
+        except serial.SerialException:
+            messageutils.print_error('Serial exception thrown')
+
+    def enable_motors(self):
+        # Check RPS status before continuing
+        if not self._ready:
+            messageutils.print_error('Serial not connected')
+            return
+        try:
+            # Flush serial
+            self._sensor_serial.flushInput()
+            self._sensor_serial.flushOutput()
+
+            # Sleep for data to transfer
+            time.sleep(0.1)
+
+            # Send the enable command
+            self._drive_serial.write('e\n')
+        except serial.SerialException:
+            messageutils.print_error('Serial exception thrown')
+
+    def disable_motors(self):
+        # Check RPS status before continuing
+        if not self._ready:
+            messageutils.print_error('Serial not connected')
+            return
+        try:
+            # Flush serial
+            self._sensor_serial.flushInput()
+            self._sensor_serial.flushOutput()
+
+            # Sleep for data to transfer
+            time.sleep(0.1)
+
+            # Send the enable command
+            self._drive_serial.write('d\n')
         except serial.SerialException:
             messageutils.print_error('Serial exception thrown')
 
@@ -93,7 +129,7 @@ class RPS:
             # Sleep for data to transfer
             time.sleep(0.1)
 
-            # Grab the current position
+            # Send the zero command
             self._sensor_serial.write('z\n')
         except serial.SerialException:
             messageutils.print_error('Serial exception thrown')
@@ -112,7 +148,7 @@ class RPS:
             time.sleep(0.1)
 
             # Set velocities
-            self._drive_serial.write('f%d r%d\n' % (x_rate, y_rate))
+            self._drive_serial.write('f%d r%d\n' % (y_rate, x_rate))
 
             # Sleep to allow transfer to complete
             time.sleep(0.1)
@@ -144,13 +180,15 @@ class RPS:
             return
 
         # Status update
-        messageutils.print_info('Traveling %d forward/back and %d right/left' % (x_dist, y_dist))
+        messageutils.print_info('Traveling %d forward/back and %d right/left' % (y_dist, x_dist))
 
         # Calculate slow rate ahead of time
-        if rate >= 100:
-            slow_rate = 100
+        if rate >= 500:
+            slow_rate = 500
         else:
             slow_rate = rate
+
+        correction_rate = 200
 
         # Zero position
         self.zero_position()
@@ -208,6 +246,27 @@ class RPS:
             # Distance met, stop moving
             self.set_velocity(0, 0)
 
+            # Determine X error
+            x, y, r = self.get_position()
+
+            if abs(y) > 0:
+                messageutils.print_info('Correcting Y error')
+
+                # Correct x change
+                if y > 0:
+                    self.set_velocity(0, -correction_rate)
+                    while y > 0:
+                        x, y, r = self.get_position()
+                        messageutils.print_info('X: ' + str(x) + ', Y: ' + str(y) + ', R: ' + str(r))
+                elif y < 0:
+                    self.set_velocity(0, correction_rate)
+                    while y < 0:
+                        x, y, r = self.get_position()
+                        messageutils.print_info('X: ' + str(x) + ', Y: ' + str(y) + ', R: ' + str(r))
+
+            # Final stop
+            self.set_velocity(0, 0)
+
         # Zero position
         self.zero_position()
 
@@ -260,7 +319,29 @@ class RPS:
 
                 # Status update
                 messageutils.print_info('Target met')
+
             # Distance met, stop moving
+            self.set_velocity(0, 0)
+
+            # Determine X error
+            x, y, r = self.get_position()
+
+            if abs(x) > 0:
+                messageutils.print_info('Correcting X error')
+
+                # Correct x change
+                if x > 0:
+                    self.set_velocity(-correction_rate, 0)
+                    while x > 0:
+                        x, y, r = self.get_position()
+                        messageutils.print_info('X: ' + str(x) + ', Y: ' + str(y) + ', R: ' + str(r))
+                elif x < 0:
+                    self.set_velocity(correction_rate, 0)
+                    while x < 0:
+                        x, y, r = self.get_position()
+                        messageutils.print_info('X: ' + str(x) + ', Y: ' + str(y) + ', R: ' + str(r))
+
+            # Final stop
             self.set_velocity(0, 0)
 
     def rotate(self, rate, degrees):

@@ -4,6 +4,15 @@ from rps import RPS
 rps = RPS('COM5', 115200, 'COM3', 115200)
 
 rps.connect()
-rps.travel(300, 20, 0)
-rps.travel(200, -20, 0)
+rps.enable_motors()
+
+for i in range(0, 4):
+    rps.travel(900, 0, 35)
+    rps.travel(900, 0, -35)
+
+rps.disable_motors()
+#rps.travel(900, 0, 20)
+#rps.travel(900, -20, 0)
+#rps.travel(900, 0, -20)
+#rps.travel(900, 20, 0)
 rps.disconnect()

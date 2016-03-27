@@ -54,7 +54,7 @@
 
 const unsigned short firmware_length = 3070;
 
-#define FIRMWARE_A4
+#define FIRMWARE_A5
 
 #ifdef FIRMWARE_A4
 const char firmware_data[] PROGMEM = {

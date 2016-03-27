@@ -109,7 +109,7 @@ void setup()
 
   // Enable stepper drivers
   pinMode(ENABLE, OUTPUT);
-  digitalWrite(ENABLE, LOW);
+  disableMotors();
 }
 
 void loop()
@@ -155,7 +155,7 @@ void zeroDirection(int direction) // 1 = NORTH, 2 = SOUTH, 3 = EAST, 4 = WEST
       // Drive until switch is hit
       while(!digitalRead(LIMIT_SWT_SOUTH))
       {
-         // Set target velocities
+        // Set target velocities
         drive.setForward(-100);
         drive.setRight(0);
         drive.setClockwise(0);
@@ -246,6 +246,14 @@ void readSerial()
           zeroDirection(Serial.parseInt());
           readState = 'o';
           break;
+        case 'e':
+          enableMotors();
+          readState = 'o';
+          break;
+        case 'd':
+          disableMotors();
+          readState = 'o';
+          break;
         default:
           readState = 'i';
       }
@@ -254,6 +262,16 @@ void readSerial()
 
     Serial.flush();
   }
+}
+
+void enableMotors()
+{
+  digitalWrite(ENABLE, LOW);
+}
+
+void disableMotors()
+{
+  digitalWrite(ENABLE, HIGH);
 }
 
 void readReceiver()
